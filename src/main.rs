@@ -128,15 +128,21 @@ impl Pipe{
 }
 
 struct PipeManager{
-    pipes : [Pipe;MAX_PIPES]
+    pipes : [Pipe;MAX_PIPES],
+    top_sprite : Texture2D,
+    bottom_sprite : Texture2D
 }
 
 impl PipeManager{
-    fn new() -> Self {
+    fn new(rl : &mut RaylibHandle, thread : &RaylibThread) -> Self {
         let rect1 : Rect = Rect::new(Vector2::zero(),PIPE_W,PIPE_H);
         let rect2 : Rect = Rect::new(Vector2::zero(),PIPE_W,PIPE_H);
         let pipe : Pipe = Pipe::new(rect1,rect2);
-        PipeManager { pipes : [ pipe ; MAX_PIPES] }
+        PipeManager { 
+            pipes : [ pipe ; MAX_PIPES],
+            top_sprite : rl.load_texture(thread,"Assets/top_pipe.png").expect("Could not load top pipe sprite"),
+            bottom_sprite : rl.load_texture(thread,"Assets/bottom_pipe.png").expect("Could not load bottom sprite")
+        }
     }
 
     fn reset(&mut self){
@@ -174,8 +180,20 @@ impl PipeManager{
 
     fn render(&self, d : &mut RaylibDrawHandle){
         for i in 0..MAX_PIPES {
-            self.pipes[i].top.draw(d);
-            self.pipes[i].bottom.draw(d);
+            //self.pipes[i].top.draw(d);
+            d.draw_texture(
+                &self.top_sprite,
+                self.pipes[i].top.position.x as i32,
+                self.pipes[i].top.position.y as i32,
+                Color::WHITE
+                );
+            //self.pipes[i].bottom.draw(d);
+            d.draw_texture(
+                &self.bottom_sprite,
+                self.pipes[i].bottom.position.x as i32,
+                self.pipes[i].bottom.position.y as i32,
+                Color::WHITE
+                );
         }
     }
 }
@@ -197,7 +215,7 @@ fn main() {
 
 fn main_loop(rl : &mut RaylibHandle, thread : &RaylibThread) {
     let mut player : Player = Player::new();
-    let mut pipes : PipeManager = PipeManager::new();
+    let mut pipes : PipeManager = PipeManager::new(rl,thread);
     pipes.reset();
     while !rl.window_should_close() {
         let delta_time : f64 = rl.get_frame_time() as f64;
