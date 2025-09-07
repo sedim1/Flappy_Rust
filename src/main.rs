@@ -59,14 +59,16 @@ impl Rect {
 struct Player{
     position : Vector2,
     velocity : Vector2,
+    sprite : Texture2D
 }
 
 impl Player{
 
-    fn new() -> Self{
+    fn new(rl : &mut RaylibHandle, thread : &RaylibThread ) -> Self{
         Self {
             position : Vector2::new( SW2, SH2),
-            velocity : Vector2::zero()
+            velocity : Vector2::zero(),
+            sprite : rl.load_texture(thread,"Assets/player.png").expect("Could not load player texture")
         }
     }
 
@@ -89,7 +91,13 @@ impl Player{
     }
 
     fn render(&self,d : &mut RaylibDrawHandle){
-        d.draw_circle(self.position.x as i32,self.position.y as i32,30.0,Color::RED);
+        //d.draw_circle(self.position.x as i32,self.position.y as i32,30.0,Color::RED);
+        d.draw_texture(
+            &self.sprite,
+            self.position.x as i32,
+            self.position.y as i32,
+            Color::WHITE
+            );
     }
 
 }
@@ -214,7 +222,7 @@ fn main() {
 }
 
 fn main_loop(rl : &mut RaylibHandle, thread : &RaylibThread) {
-    let mut player : Player = Player::new();
+    let mut player : Player = Player::new(rl,thread);
     let mut pipes : PipeManager = PipeManager::new(rl,thread);
     pipes.reset();
     while !rl.window_should_close() {
