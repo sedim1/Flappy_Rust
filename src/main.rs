@@ -72,8 +72,8 @@ impl Player{
         }
     }
 
-    fn reset_player(&mut self) {
-        self.position = Vector2::new( SW2, SH2 );
+    fn reset(&mut self) {
+        self.position = Vector2::new( SW2 - self.sprite.width() as f64 * 0.5, SH2 - self.sprite.height() as f64 * 0.5 );
         self.velocity = Vector2::zero();
     }
 
@@ -107,6 +107,7 @@ impl Player{
 struct Pipe{
     top : Rect,
     bottom : Rect,
+    flag : bool,
 }
 
 impl Pipe{
@@ -114,7 +115,8 @@ impl Pipe{
     fn new(top : Rect, bottom : Rect) -> Self {
         Pipe{
             top,
-            bottom
+            bottom,
+            flag : true
         }
     }
 
@@ -128,8 +130,12 @@ impl Pipe{
         self.bottom.position.x = posx;
     }
 
+    fn player_has_passed(&self, player : &Player) -> bool{
+        player.position.x >= self.top.position.x && self.flag
+    }
+
     fn reset_pipe_y(&mut self){
-        let pivot : f64 = ( rand::thread_rng().gen_range(70..SH as i32 -70) ) as f64;
+        let pivot : f64 = ( rand::thread_rng().gen_range(100..SH as i32 -150) ) as f64;
         self.top.position.y = pivot - (SPACE_BETWEEN_PIPES*0.5) - PIPE_H;
         self.bottom.position.y = pivot + (SPACE_BETWEEN_PIPES*0.5);
     }
@@ -158,13 +164,20 @@ impl PipeManager{
             let dist_x : f64 = PIPE_W * 3.5;
             let start_pos_x : f64 = i as f64 * dist_x;
             self.pipes[i].reset_pipe_y();
-            self.pipes[i].top.position.x = SW + start_pos_x;
-            self.pipes[i].bottom.position.x = SW + start_pos_x;
+            self.pipes[i].flag = true;
+            self.pipes[i].top.position.x = SW + 50.0 + start_pos_x;
+            self.pipes[i].bottom.position.x = SW + 50.0 + start_pos_x;
         }
     }
 
     fn player_collision_pipes(&self,player : &Player) -> bool{
-        let player_rect : Rect = Rect::new(Vector2::new(player.position.x - 30.0,player.position.y),30.0,30.0);
+        let player_rect : Rect = Rect::new(Vector2::new(player.position.x,player.position.y),player.sprite.width() as f64,player.sprite.height() as f64);
+        let floor_rect : Rect = Rect::new(Vector2::new(0.0,SH-20.0),SW,130.0);
+
+        if Rect::intersects_aabb(&player_rect,&floor_rect) {
+            return true;
+        }
+
         for i in 0..MAX_PIPES{
             if Rect::intersects_aabb(&player_rect,&self.pipes[i].top) ||Rect::intersects_aabb(&player_rect, &self.pipes[i].bottom) {
                 return true;
@@ -181,6 +194,7 @@ impl PipeManager{
             if self.pipes[i].out_of_bounds() {
                 self.pipes[i].reset_pipe_x();
                 self.pipes[i].reset_pipe_y();
+                self.pipes[i].flag = true;
             }
         }
 
@@ -206,8 +220,6 @@ impl PipeManager{
     }
 }
 
-
-
 fn main() {
     //Init raylib and setup window
     let (mut rl, thread) : (RaylibHandle,RaylibThread) = raylib::init()
@@ -224,23 +236,49 @@ fn main() {
 fn main_loop(rl : &mut RaylibHandle, thread : &RaylibThread) {
     let mut player : Player = Player::new(rl,thread);
     let mut pipes : PipeManager = PipeManager::new(rl,thread);
+    let mut score : i32 = 0;
+    let mut background_sprites : [Texture2D ; 2] = [
+        rl.load_texture(thread,"Assets/background.png").expect("Could not load background sprite"),
+        rl.load_texture(thread,"Assets/grass.png").expect("Could not load background sprite")
+    ];
+    player.reset();
     pipes.reset();
     while !rl.window_should_close() {
         let delta_time : f64 = rl.get_frame_time() as f64;
-        update(rl,delta_time,&mut player,&mut pipes);
-        render(rl,thread,&player,&pipes);
+        update(rl,delta_time,&mut player,&mut pipes,&mut score);
+        render(rl,thread,&player,&pipes,&mut background_sprites,score);
     }
 }
 
-fn update(rl : &mut RaylibHandle, dt : f64 ,player : &mut Player,pipes : &mut PipeManager){
-    player.update(rl,dt);
-    pipes.update(dt);
+fn update_score(score : &mut i32,player : &Player,pipes : &mut PipeManager){
+    for i in 0..MAX_PIPES{
+        if pipes.pipes[i].player_has_passed(player){
+            *score += 1;
+            pipes.pipes[i].flag = false;
+        }
+    }
 }
 
-fn render(rl : &mut RaylibHandle,thread : &RaylibThread,player : &Player, pipes : &PipeManager){
+fn update(rl : &mut RaylibHandle, dt : f64 ,player : &mut Player,pipes : &mut PipeManager, score : &mut i32){
+    player.update(rl,dt);
+    pipes.update(dt);
+    update_score(score,player,pipes);
+    if pipes.player_collision_pipes(&player) {
+        player.reset();
+        pipes.reset();
+        *score = 0;
+    }
+}
+
+fn render(rl : &mut RaylibHandle,thread : &RaylibThread,player : &Player, pipes : &PipeManager, background : &mut [Texture2D],score : i32){
     let mut d : RaylibDrawHandle = rl.begin_drawing(thread);//Lets us acces drawing calls
+    let score_text : &str =  &score.to_string()[..];
     d.clear_background( Color::WHITE);
+    d.draw_texture(&background[0],0,0,Color::WHITE);
     pipes.render(&mut d);
+    d.draw_texture(&background[1],0,0,Color::WHITE);
     player.render(&mut d);
+    d.draw_text(score_text,SW2 as i32 -10,10,80,Color::WHITE);
+    d.draw_text(score_text,SW2 as i32 -5,5,80,Color::BLACK);
 }
 
